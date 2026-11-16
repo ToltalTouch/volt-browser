@@ -14,7 +14,7 @@ sealed partial class BrowserWindow
     BrowsingPreferences browsing = new();
     AddressSuggestions? addressSuggestions;
     int sleepMinutes => browsing.SleepMinutes;
-    string BrowsingFile => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"VOLT","browsing.json");
+    string BrowsingFile => AppPaths.BrowsingFile;
 
     void LoadBrowsingPreferences()
     {

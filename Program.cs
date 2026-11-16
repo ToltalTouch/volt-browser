@@ -69,7 +69,7 @@ sealed partial class BrowserWindow : Form
     readonly ToolStripMenuItem pin = new("Manter esta aba ativa") { CheckOnClick = true };
     CoreWebView2Environment? environment;
     Task<CoreWebView2Environment>? environmentTask;
-    readonly string themeFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VOLT", "theme.txt");
+    string themeFile => AppPaths.ThemeFile;
     bool darkMode;
     bool blockTrackers = true;
     bool deepEconomy;
@@ -243,7 +243,26 @@ sealed partial class BrowserWindow : Form
         BuildBrowserMenu(popup, menu, dark, saver, blockers, mediaPolicy, deep, automatic);
         InitializeWindowPlacement();
         timer.Tick += async (_, _) => { await SuspendTabs(false); await SweepWhatsApp(); UpdateChrome(); ReleaseMemoryPressure(); };
-        Shown += async (_, _) => { await AddTab(); timer.Start(); };
+        Shown += async (_, _) =>
+        {
+            await AddTab();
+            timer.Start();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var info = await UpdateManager.CheckForUpdatesAsync();
+                    if (info.HasUpdate && !closing && IsHandleCreated)
+                    {
+                        BeginInvoke(new Action(() =>
+                        {
+                            status.Text = $"🎉 Nova versão do VOLT disponível: v{info.LatestVersion} (atual: v{info.CurrentVersion})! Abra o menu para atualizar.";
+                        }));
+                    }
+                }
+                catch { }
+            });
+        };
         FormClosing += (_, _) => { closing = true; restoreRefresh.Cancel(); addressSuggestions?.Dispose(); modernToolsPopup?.Dispose(); timer.Stop(); outsideWhatsApp?.Dispose(); DisposeWhatsApp(); sidebarLogo?.Image?.Dispose(); foreach (var tab in items.Values) { DisposeView(tab); ClearFavicon(tab); } timer.Dispose(); popup.Dispose(); chromeTips.Dispose(); };
     }
 
@@ -343,7 +362,7 @@ sealed partial class BrowserWindow : Form
         tab.View = view; tab.Page.Controls.Add(view); tab.Loading = true;
         try
         {
-            var profile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VOLT", "Profile");
+            var profile = AppPaths.ProfileDirectory;
             environmentTask ??= CoreWebView2Environment.CreateAsync(null, profile);
             var env = await environmentTask;
             if (closing || tab.View != view) return;

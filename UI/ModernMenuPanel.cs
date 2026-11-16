@@ -437,7 +437,90 @@ sealed partial class BrowserWindow
         sysSection.Controls.Add(btnAbout);
         sysSection.Controls.Add(modernDarkCheck);
 
+        // --- SEÇÃO 4: ATUALIZAÇÕES DO NAVEGADOR ---
+        var updateSection = CreateSectionPanel("🔄 ATUALIZAÇÕES DO NAVEGADOR");
+        var updateStatusLbl = new Label
+        {
+            Text = $"Versão atual: v{UpdateManager.CurrentVersionString}",
+            Font = new Font("Segoe UI", 8.5f),
+            Dock = DockStyle.Top,
+            Height = 22
+        };
+
+        var btnUpdate = new ModernActionBtn("🔍 Verificar atualizações agora") { Dock = DockStyle.Top, Height = 32 };
+        UpdateInfo? pendingUpdate = null;
+
+        btnUpdate.Click += async (_, _) =>
+        {
+            if (pendingUpdate != null && pendingUpdate.HasUpdate)
+            {
+                btnUpdate.Enabled = false;
+                btnUpdate.Text = "Baixando atualização... 0%";
+                updateStatusLbl.Text = $"Baixando v{pendingUpdate.LatestVersion}...";
+                try
+                {
+                    var progress = new Progress<int>(percent =>
+                    {
+                        btnUpdate.Text = $"Baixando atualização... {percent}%";
+                    });
+
+                    string downloaded = await UpdateManager.DownloadUpdateAsync(pendingUpdate, progress);
+                    btnUpdate.Text = "Atualização pronta!";
+                    updateStatusLbl.Text = "Pronto para aplicar a nova versão.";
+
+                    if (MessageBox.Show(this,
+                        $"A atualização para a versão v{pendingUpdate.LatestVersion} foi baixada com sucesso!\n\nDeseja reiniciar o VOLT agora para aplicar a atualização?",
+                        "Atualização do VOLT",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question) == DialogResult.Yes)
+                    {
+                        UpdateManager.ApplyUpdateAndRestart(downloaded);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, "Falha ao baixar atualização: " + ex.Message, "Erro de Atualização");
+                    btnUpdate.Text = "Tentar novamente";
+                    btnUpdate.Enabled = true;
+                }
+                return;
+            }
+
+            btnUpdate.Enabled = false;
+            btnUpdate.Text = "Verificando releases no GitHub...";
+            updateStatusLbl.Text = "Consultando repositório...";
+
+            try
+            {
+                var info = await UpdateManager.CheckForUpdatesAsync();
+                if (info.HasUpdate)
+                {
+                    pendingUpdate = info;
+                    updateStatusLbl.Text = $"🎉 Nova versão disponível: v{info.LatestVersion}!";
+                    btnUpdate.Text = $"⬇ Baixar e Atualizar para v{info.LatestVersion}";
+                    btnUpdate.Enabled = true;
+                }
+                else
+                {
+                    pendingUpdate = null;
+                    updateStatusLbl.Text = $"✓ O VOLT está atualizado (v{info.CurrentVersion}).";
+                    btnUpdate.Text = "Verificar novamente";
+                    btnUpdate.Enabled = true;
+                }
+            }
+            catch
+            {
+                updateStatusLbl.Text = "Não foi possível checar atualizações.";
+                btnUpdate.Text = "Tentar novamente";
+                btnUpdate.Enabled = true;
+            }
+        };
+
+        updateSection.Controls.Add(btnUpdate);
+        updateSection.Controls.Add(updateStatusLbl);
+
         // Add sections in reverse order so header is at top
+        container.Controls.Add(updateSection);
         container.Controls.Add(sysSection);
         container.Controls.Add(navSection);
         container.Controls.Add(econSection);
