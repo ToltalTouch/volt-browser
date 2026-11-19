@@ -170,7 +170,8 @@ Check(SiteCatalog.Normalize("https://www.youtube.com/") == "youtube.com", "Norma
 Check(SiteCatalog.FindCompletions("you").Contains("youtube.com"), "Autocompletar YouTube pelo prefixo");
 Check(SiteCatalog.FindCompletions("git").Contains("github.com"), "Autocompletar GitHub pelo prefixo");
 Check(SiteCatalog.FindCompletions("glo").Contains("globo.com"), "Autocompletar Globo pelo prefixo");
-Check(SiteCatalog.FindCompletions("minhapagina").Contains("minhapagina.com"), "Autocompletar síntese de domínio .com");
+Check(!SiteCatalog.FindCompletions("minhapagina").Contains("minhapagina.com"), "Não sintetiza .com para termos de pesquisa avulsos");
+Check(SiteCatalog.FindCompletions("minhapagina", new[] { "minhapagina.com" }).Contains("minhapagina.com"), "Autocompletar histórico/favoritos");
 var primaryArea=new System.Drawing.Rectangle(0,0,1920,1040);
 var leftMonitor=new System.Drawing.Rectangle(-1920,-200,1920,1080);
 var leftWork=new System.Drawing.Rectangle(-1920,-160,1920,1040);
@@ -203,4 +204,52 @@ Check(!restoreGate.TryComplete(restoreTicket,true),"Callback anterior à minimiz
 Check(restoreGate.TryComplete(nextRestore,true),"Callback atual redesenha uma vez");
 Check(!restoreGate.TryComplete(nextRestore,true),"Callback repetido não redesenha novamente");
 Check(restoreGate.TrySchedule(true,out long closingTicket) && !restoreGate.TryComplete(closingTicket,false),"Fechar antes do callback cancela trabalho");
+
+// Testes de importação de favoritos de navegadores
+string sampleChromiumJson = """
+{
+  "roots": {
+    "bookmark_bar": {
+      "children": [
+        { "name": "Google Search", "type": "url", "url": "https://www.google.com" },
+        {
+          "name": "Trabalho",
+          "type": "folder",
+          "children": [
+            { "name": "GitHub", "type": "url", "url": "https://github.com" },
+            { "name": "Notion", "type": "url", "url": "https://notion.so" }
+          ]
+        }
+      ]
+    },
+    "other": {
+      "children": [
+        { "name": "YouTube", "type": "url", "url": "https://youtube.com" }
+      ]
+    }
+  }
+}
+""";
+var chromiumBookmarks = BrowserImport.ParseChromiumBookmarksJson(sampleChromiumJson);
+Check(chromiumBookmarks.Count == 4, "Importa favoritos Chromium incluindo pastas aninhadas");
+Check(chromiumBookmarks.Any(b => b.Title == "Google Search" && b.Url == "https://www.google.com"), "Extrai favorito da raiz do Chromium");
+Check(chromiumBookmarks.Any(b => b.Title == "GitHub" && b.Url == "https://github.com"), "Extrai favorito de subpasta do Chromium");
+Check(chromiumBookmarks.Any(b => b.Title == "YouTube" && b.Url == "https://youtube.com"), "Extrai favorito de 'other' do Chromium");
+
+string sampleHtmlBookmarks = """
+<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>
+<DL><p>
+    <DT><A HREF="https://wikipedia.org">Wikipedia &amp; Enciclopédia</A>
+    <DT><A HREF="https://news.ycombinator.com">Hacker News</A>
+    <DT><A HREF="javascript:void(0)">Bookmarklet Inválido</A>
+</DL><p>
+""";
+var htmlBookmarks = BrowserImport.ParseHtmlBookmarks(sampleHtmlBookmarks);
+Check(htmlBookmarks.Count == 2, "Importa favoritos HTML ignorando links javascript não-http");
+Check(htmlBookmarks.Any(b => b.Title == "Wikipedia & Enciclopédia" && b.Url == "https://wikipedia.org"), "Decodifica entidades HTML como &amp; no título");
+Check(htmlBookmarks.Any(b => b.Title == "Hacker News" && b.Url == "https://news.ycombinator.com"), "Extrai favorito HTML padrão");
+
 Console.WriteLine($"{checks} verificações passaram.");

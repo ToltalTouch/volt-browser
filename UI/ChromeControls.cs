@@ -42,7 +42,6 @@ sealed class ChromeButton : Button
     });
     internal string Kind = "";
     internal bool Pill;
-    internal bool IsOn;
     internal bool DarkTheme;
     bool hot;
     public ChromeButton()
@@ -109,10 +108,11 @@ sealed class ChromeButton : Button
             case "favorite":
                 PointF[] heart=[new(0,6),new(-6,0),new(-6,-3),new(-3,-6),new(0,-3),new(3,-6),new(6,-3),new(6,0),new(0,6)];
                 g.DrawLines(pen,heart);break;
-            case "theme":
-                using(var fill=new SolidBrush(IsOn ? Color.FromArgb(117,159,199) : Color.FromArgb(104,118,136)))
-                using(var path=ChromeShape.Rounded(new(-12,-6,24,12),6))g.FillPath(fill,path);
-                using(var knob=new SolidBrush(Color.FromArgb(231,238,245)))g.FillEllipse(knob,IsOn ? 1 : -10,-4,8,8);break;
+            case "pip":
+                g.DrawRectangle(pen, -7, -5, 14, 10);
+                using (var pipBrush = new SolidBrush(color))
+                    g.FillRectangle(pipBrush, 0, 0, 6, 4);
+                break;
             case "minimize":g.DrawLine(pen,-6,3,6,3);break;
             case "maximize":g.DrawRectangle(pen,-5,-5,10,10);break;
             case "restore":g.DrawRectangle(pen,-5,-2,8,8);g.DrawLines(pen,new PointF[]{new(-2,-5),new(6,-5),new(6,3)});break;

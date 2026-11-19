@@ -87,7 +87,6 @@ static class SiteCatalog
                 if (nameOnly.Equals(q, StringComparison.OrdinalIgnoreCase))
                     return site;
             }
-            return q + ".com";
         }
 
         return null;
@@ -123,18 +122,6 @@ static class SiteCatalog
                 results.Add(site);
                 if (results.Count >= max) return results;
             }
-        }
-
-        // 3. Domain extension synthesis if single word without dot
-        if (!q.Any(char.IsWhiteSpace) && !q.Contains('.'))
-        {
-            string com = q + ".com";
-            if (seen.Add(com)) results.Add(com);
-            if (results.Count >= max) return results;
-
-            string comBr = q + ".com.br";
-            if (seen.Add(comBr)) results.Add(comBr);
-            if (results.Count >= max) return results;
         }
 
         // 4. Substring matches from extra sources

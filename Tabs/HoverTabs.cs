@@ -47,6 +47,7 @@ sealed class BrowserTabsHeader : Control
     TabPage[] dragGroup=[];
     public event Action<IReadOnlyList<TabPage>,int>? MoveGroupRequested;
     public event Action<IReadOnlyList<TabPage>>? CloseGroupRequested;
+    public event Action<TabPage, Point>? DetachRequested;
     readonly System.Windows.Forms.Timer animation = new() { Interval = 16 };
     readonly ToolTip tooltip = new() { InitialDelay = 700 };
     TabPage? hover, candidate, pressedClose;
@@ -69,6 +70,11 @@ sealed class BrowserTabsHeader : Control
         {
             var snapshot=Pages.Where(p=>selection.Items.Contains(p)).ToArray();
             if(snapshot.Length>0)CloseGroupRequested?.Invoke(snapshot);
+        });
+        groupMenu.Items.Add("Mover para nova janela", null, (_, _) =>
+        {
+            if (model.SelectedTab is { } tab && tab != plusPage)
+                DetachRequested?.Invoke(tab, Cursor.Position);
         });
         Dock = DockStyle.Top; Height = 36; Font = new Font("Segoe UI", 9.5f);
         BackColor = Color.FromArgb(232, 239, 245); ForeColor = Color.FromArgb(41, 52, 63);
@@ -334,13 +340,24 @@ sealed class BrowserTabsHeader : Control
         if(moved && page is not null && visuals.TryGetValue(page,out var v))v.X=Ghost().X;
         pressedClose=null;candidate=null;dragging=false;dragGroup=[];Capture=false;
         if(close is not null && AtClose(close,e.Location))model.RequestClose(close);
-        else if(moved && page is not null && ClientRectangle.Contains(e.Location))
+        else if(moved && page is not null)
         {
-            rangeClick=true;
-            try {if(group.Length>1)MoveGroupRequested?.Invoke(group,target);else model.RequestMove(page,target);}
-            finally{rangeClick=false;}
-            if(model.SelectedTab is { } active && active!=plusPage)
-                selection.Click(Pages,active,false);
+            Point screenPt = PointToScreen(e.Location);
+            var parentForm = FindForm();
+            bool outsideWindow = parentForm == null || !parentForm.Bounds.Contains(screenPt);
+            bool outsideHeader = e.Y < -Px(20) || e.Y > Height + Px(40) || e.X < -Px(40) || e.X > Width + Px(40);
+            if (outsideWindow || outsideHeader)
+            {
+                DetachRequested?.Invoke(page, screenPt);
+            }
+            else if (ClientRectangle.Contains(e.Location))
+            {
+                rangeClick=true;
+                try {if(group.Length>1)MoveGroupRequested?.Invoke(group,target);else model.RequestMove(page,target);}
+                finally{rangeClick=false;}
+                if(model.SelectedTab is { } active && active!=plusPage)
+                    selection.Click(Pages,active,false);
+            }
         }
         else if(!moved && page is not null)selection.Click(Pages,page,false);
         RefreshLayout();

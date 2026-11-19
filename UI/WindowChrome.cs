@@ -16,7 +16,22 @@ sealed partial class BrowserWindow
     {
         try { if(File.Exists(BookmarkFile)) bookmarks.AddRange(JsonSerializer.Deserialize<List<SavedLink>>(File.ReadAllText(BookmarkFile)) ?? []); }
         catch(Exception ex) when(ex is IOException or UnauthorizedAccessException or JsonException) { }
+        bookmarkBar.Visible = browsing.ShowBookmarksBar;
+        var barContext = new ContextMenuStrip();
+        barContext.Items.Add("Importar favoritos de outros navegadores…", null, (_, _) => ShowBrowserImportDialog());
+        barContext.Items.Add(new ToolStripSeparator());
+        barContext.Items.Add("Ocultar barra de favoritos (Ctrl+Shift+B)", null, (_, _) => ToggleBookmarksBar(false));
+        bookmarkBar.ContextMenuStrip = barContext;
         RenderBookmarks();
+    }
+    void ToggleBookmarksBar(bool? visible = null)
+    {
+        bool show = visible ?? !bookmarkBar.Visible;
+        bookmarkBar.Visible = show;
+        browsing.ShowBookmarksBar = show;
+        SaveBrowsingPreferences();
+        UpdateModernMenuValues();
+        status.Text = show ? "Barra de favoritos visível." : "Barra de favoritos oculta.";
     }
     void RenderBookmarks()
     {
@@ -26,12 +41,20 @@ sealed partial class BrowserWindow
             if(!ResourcePolicy.IsHttp(item.Url)) continue;
             var b = new ChromeButton {Text=item.Title,Kind="",Height=24,Width=Math.Clamp(TextRenderer.MeasureText(item.Title,Font).Width+18,60,170),Font=new("Segoe UI",8.5f),Margin=new(0,0,6,0),Tag="chrome",AccessibleName=item.Title};
             b.Click+=(_,_)=>{ if(Current is { } tab) _=NavigateTab(tab,item.Url); };
-            var context=new ContextMenuStrip(); context.Items.Add("Remover favorito",null,(_,_)=>{bookmarks.Remove(item);SaveBookmarks();RenderBookmarks();});
+            var context=new ContextMenuStrip();
+            context.Items.Add("Remover favorito",null,(_,_)=>{bookmarks.Remove(item);SaveBookmarks();RenderBookmarks();});
+            context.Items.Add("Ocultar barra de favoritos",null,(_,_)=>ToggleBookmarksBar(false));
             b.ContextMenuStrip=context;b.Disposed+=(_,_)=>context.Dispose();
             bookmarkBar.Controls.Add(b);BrowserTheme.Apply(b,darkMode);
         }
         if(bookmarks.Count==0)
-            bookmarkBar.Controls.Add(new Label {Text="Seus favoritos ficam aqui. Use o coração para salvar uma página.",AutoSize=true,Font=new("Segoe UI",8.5f),ForeColor=Color.FromArgb(112,127,145),Margin=new(3,5,0,0)});
+        {
+            var emptyLabel = new Label {Text="Seus favoritos ficam aqui. Use o coração para salvar uma página ou ",AutoSize=true,Font=new("Segoe UI",8.5f),ForeColor=Color.FromArgb(112,127,145),Margin=new(3,5,0,0)};
+            var importLink = new LinkLabel {Text="importar de outro navegador.",AutoSize=true,Font=new("Segoe UI",8.5f),LinkColor=Color.FromArgb(14,165,233),Margin=new(0,5,0,0),Cursor=Cursors.Hand};
+            importLink.LinkClicked += (_, _) => ShowBrowserImportDialog();
+            bookmarkBar.Controls.Add(emptyLabel);
+            bookmarkBar.Controls.Add(importLink);
+        }
         BrowserTheme.Apply(bookmarkBar,darkMode);
         RefreshAddressSuggestions();
     }

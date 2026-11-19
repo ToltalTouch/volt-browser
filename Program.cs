@@ -14,7 +14,31 @@ static class Program
         // Stable identity keeps the running window grouped under VOLT in the taskbar.
         SetCurrentProcessExplicitAppUserModelID("VOLT.Browser");
         ApplicationConfiguration.Initialize();
-        Application.Run(new BrowserWindow());
+        Application.Run(new BrowserAppContext(new BrowserWindow()));
+    }
+}
+
+sealed class BrowserAppContext : ApplicationContext
+{
+    private static readonly HashSet<Form> activeWindows = new();
+
+    public BrowserAppContext(Form initialWindow)
+    {
+        TrackWindow(initialWindow);
+        initialWindow.Show();
+    }
+
+    public static void TrackWindow(Form window)
+    {
+        activeWindows.Add(window);
+        window.FormClosed += (s, _) =>
+        {
+            if (s is Form f) activeWindows.Remove(f);
+            if (activeWindows.Count == 0)
+            {
+                Application.Exit();
+            }
+        };
     }
 }
 
@@ -91,7 +115,7 @@ sealed partial class BrowserWindow : Form
     bool economy = true;
     BrowserTab? Current => tabs.SelectedTab is { } page && items.TryGetValue(page, out var tab) ? tab : null;
 
-    public BrowserWindow()
+    public BrowserWindow(string? initialUrl = null)
     {
         LoadBrowsingPreferences();
         Text = "VOLT — Navegue sem peso";
@@ -114,18 +138,19 @@ sealed partial class BrowserWindow : Form
         toolbar.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         foreach(int width in new[]{30,30,32,32}) toolbar.ColumnStyles.Add(new(SizeType.Absolute,width));
         toolbar.ColumnStyles.Add(new(SizeType.Percent,100));
-        foreach(int width in new[]{34,34,40,36}) toolbar.ColumnStyles.Add(new(SizeType.Absolute,width));
+        foreach(int width in new[]{34,34,34,36}) toolbar.ColumnStyles.Add(new(SizeType.Absolute,width));
         var reload=MakeButton("↻");var home=MakeButton("Início");
         var menu=MakeButton("Menu");var favorite=bookmarkButton;var downloads=downloadsButton;
+        var pip=MakeButton("PiP");
+        pip.AccessibleName="Picture-in-Picture (Vídeo flutuante) [Alt+P]";
+        pip.Click+=async(_,_)=>await TogglePictureInPicture();
         favorite.Click+=(_,_)=>AddBookmark();
         downloads.Click+=(_,_)=>{if(Current?.Ready==true)Current.View!.CoreWebView2.OpenDefaultDownloadDialog();};
         toolbar.Controls.Add(back,0,0);toolbar.Controls.Add(forward,1,0);toolbar.Controls.Add(reload,2,0);toolbar.Controls.Add(home,3,0);
         var addressPanel=new RoundedSurface {Dock=DockStyle.Fill,Padding=new(12,0,12,0),BackColor=Color.White,Tag="surface",Margin=new(4,1,6,1)};
         address.Font=new("Segoe UI",10);var addressHost=new CenteredTextHost(address) {Dock=DockStyle.Fill,Tag="surface",BackColor=Color.White};
         addressPanel.Controls.Add(addressHost);toolbar.Controls.Add(addressPanel,4,0);
-        var themeToggle=MakeButton("Tema");
-        themeToggle.AccessibleDescription="Alternar entre os temas claro e escuro com um clique";
-        toolbar.Controls.Add(favorite,5,0);toolbar.Controls.Add(downloads,6,0);toolbar.Controls.Add(themeToggle,7,0);toolbar.Controls.Add(menu,8,0);
+        toolbar.Controls.Add(pip,5,0);toolbar.Controls.Add(favorite,6,0);toolbar.Controls.Add(downloads,7,0);toolbar.Controls.Add(menu,8,0);
         tabs.TabPages.Add(plusTab);
         var tabHeader=new BrowserTabsHeader(tabs,plusTab) {Dock=DockStyle.Fill};
         browserTabHeader=tabHeader;
@@ -133,6 +158,7 @@ sealed partial class BrowserWindow : Form
         tabHeader.CloseGroupRequested+=CloseTabGroup;
         tabHeader.MoveGroupRequested+=MoveTabGroup;
         tabHeader.EmptyDragRequested+=doubleClick=>{if(doubleClick)ToggleMaximize();else DragWindow();};
+        tabHeader.DetachRequested+=DetachTab;
         var titleBar=new Panel {Dock=DockStyle.Top,Height=36,Tag="chrome"};
         var caption=new TableLayoutPanel {Dock=DockStyle.Right,Width=126,ColumnCount=3,RowCount=1,Tag="chrome",Margin=Padding.Empty};
         caption.RowStyles.Add(new(SizeType.Percent,100));
@@ -180,19 +206,9 @@ sealed partial class BrowserWindow : Form
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         var popup = new ContextMenuStrip();
         var dark = new ToolStripMenuItem("Modo escuro") { Checked = darkMode, CheckOnClick = true };
-        void UpdateThemeToggle()
-        {
-            ((ChromeButton)themeToggle).IsOn = darkMode;
-            themeToggle.Invalidate();
-            themeToggle.AccessibleName = darkMode ? "Ativar modo claro" : "Ativar modo escuro";
-            chromeTips.SetToolTip(themeToggle,themeToggle.AccessibleName);
-        }
-        themeToggle.Click += (_, _) => dark.Checked = !dark.Checked;
-        UpdateThemeToggle();
         dark.CheckedChanged += (_, _) =>
         {
             darkMode = dark.Checked;
-            UpdateThemeToggle();
             using(var redraw=new ThemeRedraw(this)) BrowserTheme.Apply(this, darkMode);
             addressSuggestions?.ApplyTheme(darkMode);
             popup.Renderer = darkMode ? new ToolStripProfessionalRenderer(new DarkMenuColors()) : new ToolStripProfessionalRenderer();
@@ -245,7 +261,22 @@ sealed partial class BrowserWindow : Form
         timer.Tick += async (_, _) => { await SuspendTabs(false); await SweepWhatsApp(); UpdateChrome(); ReleaseMemoryPressure(); };
         Shown += async (_, _) =>
         {
-            await AddTab();
+            if (initialUrl != null)
+            {
+                await AddTab(initialUrl);
+            }
+            else if (browsing.RestoreTabsOnStartup && browsing.SavedSessionTabs.Count > 0)
+            {
+                var sessionTabs = browsing.SavedSessionTabs.ToArray();
+                foreach (var savedUrl in sessionTabs)
+                {
+                    await AddTab(savedUrl);
+                }
+            }
+            else
+            {
+                await AddTab();
+            }
             timer.Start();
             _ = Task.Run(async () =>
             {
@@ -263,7 +294,37 @@ sealed partial class BrowserWindow : Form
                 catch { }
             });
         };
-        FormClosing += (_, _) => { closing = true; restoreRefresh.Cancel(); addressSuggestions?.Dispose(); modernToolsPopup?.Dispose(); timer.Stop(); outsideWhatsApp?.Dispose(); DisposeWhatsApp(); sidebarLogo?.Image?.Dispose(); foreach (var tab in items.Values) { DisposeView(tab); ClearFavicon(tab); } timer.Dispose(); popup.Dispose(); chromeTips.Dispose(); };
+        FormClosing += (_, _) =>
+        {
+            closing = true;
+            if (browsing.RestoreTabsOnStartup)
+            {
+                browsing.SavedSessionTabs = items.Values
+                    .Select(t => t.Url)
+                    .Where(u => !string.IsNullOrWhiteSpace(u) && ResourcePolicy.IsHttp(u))
+                    .ToList()!;
+            }
+            else
+            {
+                browsing.SavedSessionTabs.Clear();
+            }
+            SaveBrowsingPreferences();
+            restoreRefresh.Cancel();
+            addressSuggestions?.Dispose();
+            modernToolsPopup?.Dispose();
+            timer.Stop();
+            outsideWhatsApp?.Dispose();
+            DisposeWhatsApp();
+            sidebarLogo?.Image?.Dispose();
+            foreach (var tab in items.Values)
+            {
+                DisposeView(tab);
+                ClearFavicon(tab);
+            }
+            timer.Dispose();
+            popup.Dispose();
+            chromeTips.Dispose();
+        };
     }
 
     void SetWebTheme(BrowserView view)
@@ -278,7 +339,7 @@ sealed partial class BrowserWindow : Form
         Text=label, Dock=DockStyle.Fill, AutoSize=false, BackColor=Color.FromArgb(239,244,248),
         ForeColor=Color.FromArgb(57,72,89), Font=new("Segoe UI",10), Margin=new(1), Padding=Padding.Empty,
         Tag="chrome", AccessibleName=label,
-        Kind=label switch { "‹"=>"back", "›"=>"forward", "↻"=>"reload", "Início"=>"home", "Menu"=>"menu", "Favoritar"=>"favorite", "Downloads"=>"download", "Tema"=>"theme", "Minimizar"=>"minimize", "Maximizar"=>"maximize", "Fechar janela"=>"close", _=>"" }
+        Kind=label switch { "‹"=>"back", "›"=>"forward", "↻"=>"reload", "Início"=>"home", "Menu"=>"menu", "Favoritar"=>"favorite", "Downloads"=>"download", "PiP"=>"pip", "Tema"=>"theme", "Minimizar"=>"minimize", "Maximizar"=>"maximize", "Fechar janela"=>"close", _=>"" }
     };
 
     async Task AddTab(string? url = null)
@@ -350,6 +411,103 @@ sealed partial class BrowserWindow : Form
         UpdateChrome();
     }
 
+    void ApplySavedZoom(BrowserTab tab, BrowserView view)
+    {
+        double savedZoom = GetSavedZoom(tab.Url);
+        if (Math.Abs(view.ZoomFactor - savedZoom) > 0.01)
+        {
+            try { view.ZoomFactor = savedZoom; }
+            catch { }
+        }
+    }
+
+    void DetachTab(TabPage page, Point screenPt)
+    {
+        if (closing || !items.TryGetValue(page, out var tab)) return;
+        if (items.Count <= 1)
+        {
+            status.Text = "Esta é a única aba desta janela e não pode ser separada.";
+            return;
+        }
+
+        string? url = tab.Url;
+        CloseTab(tab);
+
+        var newWindow = new BrowserWindow(url);
+        newWindow.StartPosition = FormStartPosition.Manual;
+        var workingArea = Screen.FromPoint(screenPt).WorkingArea;
+        int targetX = Math.Clamp(screenPt.X - 100, workingArea.Left, Math.Max(workingArea.Left, workingArea.Right - 800));
+        int targetY = Math.Clamp(screenPt.Y - 20, workingArea.Top, Math.Max(workingArea.Top, workingArea.Bottom - 600));
+        newWindow.Location = new Point(targetX, targetY);
+        BrowserAppContext.TrackWindow(newWindow);
+        newWindow.Show();
+    }
+
+    async Task TogglePictureInPicture()
+    {
+        if (Current?.Ready != true || Current.View?.CoreWebView2 is not { } core)
+        {
+            status.Text = "Nenhuma página ativa para Picture-in-Picture.";
+            return;
+        }
+
+        string js = @"(async function() {
+            try {
+                if (document.pictureInPictureElement) {
+                    await document.exitPictureInPicture();
+                    return 'exited';
+                }
+                const videos = Array.from(document.querySelectorAll('video'));
+                if (videos.length === 0) return 'no_video';
+                let v = videos.find(x => !x.paused && !x.ended && x.currentTime > 0)
+                     || videos.find(x => x.readyState > 1)
+                     || videos[0];
+                if (v.disablePictureInPicture) v.disablePictureInPicture = false;
+                await v.requestPictureInPicture();
+                return 'entered';
+            } catch(err) {
+                return 'error: ' + err.message;
+            }
+        })()";
+
+        try
+        {
+            string result = await core.ExecuteScriptAsync(js);
+            string clean = result?.Trim('"', ' ', '\r', '\n') ?? "";
+            if (clean == "no_video")
+            {
+                foreach (var frame in Current.Frames)
+                {
+                    try
+                    {
+                        string fResult = await frame.ExecuteScriptAsync(js);
+                        string fClean = fResult?.Trim('"', ' ', '\r', '\n') ?? "";
+                        if (fClean == "entered") { status.Text = "Vídeo em modo Picture-in-Picture."; return; }
+                        if (fClean == "exited") { status.Text = "Picture-in-Picture desativado."; return; }
+                    }
+                    catch { }
+                }
+                status.Text = "Nenhum vídeo compatível encontrado na página para Picture-in-Picture.";
+            }
+            else if (clean == "entered")
+            {
+                status.Text = "Vídeo em modo Picture-in-Picture.";
+            }
+            else if (clean == "exited")
+            {
+                status.Text = "Picture-in-Picture desativado.";
+            }
+            else if (clean.StartsWith("error:"))
+            {
+                status.Text = "Picture-in-Picture: " + clean[6..].Trim();
+            }
+        }
+        catch (Exception ex)
+        {
+            status.Text = "Picture-in-Picture: " + ex.Message;
+        }
+    }
+
     async Task NavigateTab(BrowserTab tab, string url)
     {
         if (closing || !items.ContainsKey(tab.Page) || !ResourcePolicy.IsHttp(url)) return;
@@ -374,6 +532,22 @@ sealed partial class BrowserWindow : Form
             var core = view.CoreWebView2;
             core.Settings.AreDevToolsEnabled = false;
             core.Settings.IsStatusBarEnabled = true;
+            core.ContextMenuRequested += (_, ce) =>
+            {
+                var pipItem = env.CreateContextMenuItem("Picture-in-Picture (Janela flutuante)", null, CoreWebView2ContextMenuItemKind.Command);
+                pipItem.CustomItemSelected += (_, _) => _ = TogglePictureInPicture();
+                ce.MenuItems.Add(pipItem);
+            };
+            view.ZoomFactorChanged += (_, _) =>
+            {
+                if (closing || tab.View != view) return;
+                SaveSiteZoom(tab.Url, view.ZoomFactor);
+                if (Current == tab && GetSiteKey(tab.Url) is { } siteHost)
+                {
+                    int pct = (int)Math.Round(view.ZoomFactor * 100);
+                    status.Text = $"Zoom ({siteHost}): {pct}%";
+                }
+            };
             // Só intercepta domínios da lista, sem trazer todo o tráfego para a UI.
             foreach (var domain in ResourcePolicy.TrackerDomains)
                 foreach (var scheme in new[] { "https", "http" })
@@ -408,6 +582,7 @@ sealed partial class BrowserWindow : Form
                 if(!closing && tab.View==view && e.IsSuccess)
                 {
                     RememberAddress(core.Source);
+                    ApplySavedZoom(tab, view);
                     _ = UpdateFavicon(tab, view);
                 }
                 if (Current == tab && !e.IsSuccess) status.Text = "Não foi possível carregar a página: " + e.WebErrorStatus;
@@ -435,6 +610,7 @@ sealed partial class BrowserWindow : Form
             core.ProcessFailed += (_, _) => { if (!closing) status.Text = "Uma página parou de responder. Recarregue a aba."; };
             await InstallMediaGuard(tab, view);
             if (closing || tab.View != view) return;
+            ApplySavedZoom(tab, view);
             core.Navigate(tab.Url!);
             UpdateChrome();
         }
@@ -481,7 +657,7 @@ sealed partial class BrowserWindow : Form
         if (Current is { } tab)
         {
             if (tab.View is { } web) web.SetPageVisible(true);
-            if (tab.Ready) { tab.View!.CoreWebView2.Resume(); tab.SleepResult = "Em uso"; }
+            if (tab.Ready) { tab.View!.CoreWebView2.Resume(); tab.SleepResult = "Em uso"; ApplySavedZoom(tab, tab.View!); }
             else if (tab.Unloaded && tab.Url is { } url) _ = NavigateTab(tab, url);
         }
         if (oldTab is not null && oldTab != Current && oldTab.Ready) _ = ApplyMediaGuard(oldTab);
@@ -763,6 +939,32 @@ sealed partial class BrowserWindow : Form
         if (keyData == (Keys.Control | Keys.L)) { address.Focus(); address.SelectAll(); return true; }
         if (keyData == (Keys.Control | Keys.T)) { _ = AddTab(); return true; }
         if (keyData == (Keys.Control | Keys.W)) { CloseTab(); return true; }
+        if (keyData == (Keys.Control | Keys.Shift | Keys.B)) { ToggleBookmarksBar(); return true; }
+        if (keyData == (Keys.Alt | Keys.P)) { _ = TogglePictureInPicture(); return true; }
+        if (keyData == (Keys.Control | Keys.Oemplus) || keyData == (Keys.Control | Keys.Add))
+        {
+            if (Current?.Ready == true)
+            {
+                Current.View!.ZoomFactor = Math.Min(5.0, Math.Round(Current.View.ZoomFactor + 0.1, 2));
+                return true;
+            }
+        }
+        if (keyData == (Keys.Control | Keys.OemMinus) || keyData == (Keys.Control | Keys.Subtract))
+        {
+            if (Current?.Ready == true)
+            {
+                Current.View!.ZoomFactor = Math.Max(0.25, Math.Round(Current.View.ZoomFactor - 0.1, 2));
+                return true;
+            }
+        }
+        if (keyData == (Keys.Control | Keys.D0) || keyData == (Keys.Control | Keys.NumPad0))
+        {
+            if (Current?.Ready == true)
+            {
+                Current.View!.ZoomFactor = 1.0;
+                return true;
+            }
+        }
         if (keyData == Keys.F5 && Current?.Ready == true) { Current.View!.Reload(); return true; }
         return base.ProcessCmdKey(ref msg, keyData);
     }

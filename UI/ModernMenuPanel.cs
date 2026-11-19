@@ -4,6 +4,18 @@ namespace Volt;
 
 sealed partial class BrowserWindow
 {
+    static GraphicsPath CreateRoundedRectPath(RectangleF r, float radius)
+    {
+        var path = new GraphicsPath();
+        float d = radius * 2;
+        path.AddArc(r.X, r.Y, d, d, 180, 90);
+        path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+        path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+        path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+        path.CloseFigure();
+        return path;
+    }
+
     sealed class ModernPillButton : Button
     {
         [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
@@ -24,6 +36,7 @@ sealed partial class BrowserWindow
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
             DoubleBuffered = true;
+            UseMnemonic = false;
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -39,7 +52,7 @@ sealed partial class BrowserWindow
                 ? Color.White
                 : (Dark ? Color.FromArgb(215, 226, 238) : Color.FromArgb(51, 65, 85));
 
-            using var path = CreateRoundedRect(new RectangleF(0, 0, Width - 1, Height - 1), 5);
+            using var path = CreateRoundedRectPath(new RectangleF(0, 0, Width - 1, Height - 1), 5);
             using var brush = new SolidBrush(bg);
             g.FillPath(brush, path);
 
@@ -52,18 +65,6 @@ sealed partial class BrowserWindow
             TextRenderer.DrawText(g, Text, Font, ClientRectangle, textCol,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
         }
-
-        static GraphicsPath CreateRoundedRect(RectangleF r, float radius)
-        {
-            var path = new GraphicsPath();
-            float d = radius * 2;
-            path.AddArc(r.X, r.Y, d, d, 180, 90);
-            path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
-            path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
-            path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
-            path.CloseFigure();
-            return path;
-        }
     }
 
     sealed class ModernActionBtn : Button
@@ -74,13 +75,14 @@ sealed partial class BrowserWindow
         public ModernActionBtn(string text)
         {
             Text = text;
-            Height = 30;
+            Height = 32;
             Cursor = Cursors.Hand;
             Font = new Font("Segoe UI", 9f);
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
             DoubleBuffered = true;
-            Margin = new Padding(2, 3, 2, 3);
+            Margin = new Padding(0, 3, 0, 3);
+            UseMnemonic = false;
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -91,7 +93,7 @@ sealed partial class BrowserWindow
             Color bg = Dark ? Color.FromArgb(45, 56, 73) : Color.FromArgb(235, 240, 246);
             Color textCol = Dark ? Color.FromArgb(220, 230, 242) : Color.FromArgb(40, 55, 75);
 
-            using var path = CreateRoundedRect(new RectangleF(0, 0, Width - 1, Height - 1), 5);
+            using var path = CreateRoundedRectPath(new RectangleF(0, 0, Width - 1, Height - 1), 5);
             using var brush = new SolidBrush(bg);
             g.FillPath(brush, path);
 
@@ -101,17 +103,87 @@ sealed partial class BrowserWindow
             TextRenderer.DrawText(g, Text, Font, ClientRectangle, textCol,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
         }
+    }
 
-        static GraphicsPath CreateRoundedRect(RectangleF r, float radius)
+    sealed class ModernMenuTabBtn : Button
+    {
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        public bool IsSelected { get; set; }
+
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        public bool Dark { get; set; }
+
+        public ModernMenuTabBtn(string text)
         {
-            var path = new GraphicsPath();
-            float d = radius * 2;
-            path.AddArc(r.X, r.Y, d, d, 180, 90);
-            path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
-            path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
-            path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
-            path.CloseFigure();
-            return path;
+            Text = text;
+            Height = 32;
+            Cursor = Cursors.Hand;
+            Font = new Font("Segoe UI", 8.75f, FontStyle.Bold);
+            FlatStyle = FlatStyle.Flat;
+            FlatAppearance.BorderSize = 0;
+            DoubleBuffered = true;
+            Margin = new Padding(2, 0, 2, 0);
+            UseMnemonic = false;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            Color bg = IsSelected
+                ? (Dark ? Color.FromArgb(14, 165, 233) : Color.FromArgb(2, 132, 199))
+                : (Dark ? Color.FromArgb(34, 43, 56) : Color.FromArgb(241, 245, 249));
+
+            Color textCol = IsSelected
+                ? Color.White
+                : (Dark ? Color.FromArgb(165, 180, 200) : Color.FromArgb(71, 85, 105));
+
+            using var path = CreateRoundedRectPath(new RectangleF(0, 0, Width - 1, Height - 1), 6);
+            using var brush = new SolidBrush(bg);
+            g.FillPath(brush, path);
+
+            if (!IsSelected)
+            {
+                using var border = new Pen(Dark ? Color.FromArgb(50, 63, 82) : Color.FromArgb(220, 228, 238), 1);
+                g.DrawPath(border, path);
+            }
+
+            TextRenderer.DrawText(g, Text, Font, ClientRectangle, textCol,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+        }
+    }
+
+    sealed class ModernCardPanel : FlowLayoutPanel
+    {
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        public bool Dark { get; set; }
+
+        public ModernCardPanel()
+        {
+            DoubleBuffered = true;
+            FlowDirection = FlowDirection.TopDown;
+            WrapContents = false;
+            AutoSize = true;
+            AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            Padding = new Padding(12, 10, 12, 10);
+            Margin = new Padding(0, 0, 0, 10);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            Color bg = Dark ? Color.FromArgb(36, 45, 59) : Color.White;
+            Color border = Dark ? Color.FromArgb(52, 65, 85) : Color.FromArgb(226, 232, 240);
+
+            using var path = CreateRoundedRectPath(new RectangleF(0, 0, Width - 1, Height - 1), 7);
+            using var brush = new SolidBrush(bg);
+            g.FillPath(brush, path);
+
+            using var pen = new Pen(border, 1);
+            g.DrawPath(pen, path);
         }
     }
 
@@ -149,43 +221,98 @@ sealed partial class BrowserWindow
     CheckBox? modernAutoMemCheck;
     CheckBox? modernBlockersCheck;
     CheckBox? modernDarkCheck;
+    CheckBox? modernBookmarksCheck;
+    CheckBox? modernRestoreTabsCheck;
+
+    readonly List<ModernMenuTabBtn> modernTabButtons = new();
+    readonly List<FlowLayoutPanel> modernTabPages = new();
 
     void InitializeModernToolsMenu(Button menuButton)
     {
         modernToolsPopup = new ModernToolsDropDown();
-        int panelWidth = (int)(380 * DeviceDpi / 96f);
-        int panelHeight = (int)(560 * DeviceDpi / 96f);
+        int panelWidth = (int)(425 * DeviceDpi / 96f);
+        int panelHeight = (int)(580 * DeviceDpi / 96f);
+        int cardWidth = panelWidth - (int)(38 * DeviceDpi / 96f);
+        int contentWidth = cardWidth - (int)(24 * DeviceDpi / 96f);
 
-        var container = new ModernMenuScrollContainer
+        var rootContainer = new ModernMenuScrollContainer
         {
             Width = panelWidth,
             Height = panelHeight,
-            AutoScroll = true,
-            Padding = new Padding(12, 10, 12, 12)
+            Padding = new Padding(10, 10, 10, 10)
         };
-        modernMenuPanel = container;
+        modernMenuPanel = rootContainer;
 
         // --- HEADER ---
-        var headerPanel = new Panel { Dock = DockStyle.Top, Height = 46, Margin = Padding.Empty };
+        var headerPanel = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 44,
+            Margin = Padding.Empty
+        };
         var titleLbl = new Label
         {
-            Text = "VOLT • Ferramentas & Desempenho",
+            Text = "VOLT • Configurações & Ferramentas",
             Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
             Dock = DockStyle.Top,
-            Height = 24
+            Height = 22,
+            UseMnemonic = false
         };
         var subTitleLbl = new Label
         {
-            Text = "Controle de abas, economia e privacidade",
-            Font = new Font("Segoe UI", 8.5f),
+            Text = "Controle de abas, desempenho, aparência e segurança",
+            Font = new Font("Segoe UI", 8.25f),
             Dock = DockStyle.Top,
-            Height = 18
+            Height = 18,
+            UseMnemonic = false
         };
         headerPanel.Controls.Add(subTitleLbl);
         headerPanel.Controls.Add(titleLbl);
 
-        // --- SEÇÃO 1: MODO DE ECONOMIA & DESEMPENHO ---
-        var econSection = CreateSectionPanel("⚡ MODO DE ECONOMIA & DESEMPENHO");
+        // --- TABS BAR ---
+        var tabsPanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 36,
+            RowCount = 1,
+            ColumnCount = 4,
+            Margin = new Padding(0, 4, 0, 8),
+            Padding = Padding.Empty
+        };
+        tabsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+        tabsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+        tabsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+        tabsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+
+        var tabEco = new ModernMenuTabBtn("⚡ Economia") { Dock = DockStyle.Fill, IsSelected = true };
+        var tabVisual = new ModernMenuTabBtn("🎨 Visual") { Dock = DockStyle.Fill };
+        var tabSec = new ModernMenuTabBtn("🔒 Segurança") { Dock = DockStyle.Fill };
+        var tabSys = new ModernMenuTabBtn("ℹ️ Sistema") { Dock = DockStyle.Fill };
+
+        modernTabButtons.Clear();
+        modernTabButtons.Add(tabEco);
+        modernTabButtons.Add(tabVisual);
+        modernTabButtons.Add(tabSec);
+        modernTabButtons.Add(tabSys);
+
+        tabsPanel.Controls.Add(tabEco, 0, 0);
+        tabsPanel.Controls.Add(tabVisual, 1, 0);
+        tabsPanel.Controls.Add(tabSec, 2, 0);
+        tabsPanel.Controls.Add(tabSys, 3, 0);
+
+        // --- CONTENT CONTAINER ---
+        var pagesContainer = new Panel
+        {
+            Dock = DockStyle.Fill,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+
+        // ================= PAGE 1: ECONOMIA =================
+        var pageEco = CreateTabPage();
+
+        // Card 1: Suspensão de abas
+        var ecoCard1 = CreateMenuCard("SUSPENSÃO AUTOMÁTICA DE ABAS", cardWidth, contentWidth);
 
         modernEconomyCheck = CreateModernCheckBox("Ativar modo de economia (suspender abas)", economy);
         modernEconomyCheck.CheckedChanged += (_, _) =>
@@ -198,9 +325,18 @@ sealed partial class BrowserWindow
             }
             UpdateChrome();
         };
+        ecoCard1.Controls.Add(modernEconomyCheck);
 
         var timeLabel = CreateSubtitleLabel("Tempo de inatividade antes de suspender:");
-        var timeFlow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 2, 0, 6) };
+        ecoCard1.Controls.Add(timeLabel);
+
+        var timeFlow = new FlowLayoutPanel
+        {
+            Width = contentWidth,
+            AutoSize = true,
+            WrapContents = true,
+            Margin = new Padding(0, 2, 0, 6)
+        };
         modernTimePills.Clear();
         foreach (var (mins, label) in new[]
         {
@@ -223,9 +359,18 @@ sealed partial class BrowserWindow
             timeFlow.Controls.Add(pill);
             modernTimePills.Add((pill, mins));
         }
+        ecoCard1.Controls.Add(timeFlow);
 
         var priorityLabel = CreateSubtitleLabel("Prioridade de abas (manter sempre ativas):");
-        var priorityFlow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 2, 0, 6) };
+        ecoCard1.Controls.Add(priorityLabel);
+
+        var priorityFlow = new FlowLayoutPanel
+        {
+            Width = contentWidth,
+            AutoSize = true,
+            WrapContents = true,
+            Margin = new Padding(0, 2, 0, 6)
+        };
         modernPriorityPills.Clear();
         foreach (var (count, label) in new[]
         {
@@ -267,7 +412,8 @@ sealed partial class BrowserWindow
                 Text = "Manter as primeiras N abas ativas (da esquerda para a direita):\nElas nunca entrarão em modo de economia.",
                 AutoSize = false,
                 Bounds = new(16, 16, 408, 44),
-                ForeColor = dialog.ForeColor
+                ForeColor = dialog.ForeColor,
+                UseMnemonic = false
             };
             var countInput = new NumericUpDown
             {
@@ -284,7 +430,8 @@ sealed partial class BrowserWindow
                 DialogResult = DialogResult.OK,
                 Bounds = new(320, 110, 100, 32),
                 BackColor = darkMode ? Color.FromArgb(45, 58, 73) : SystemColors.ButtonFace,
-                ForeColor = dialog.ForeColor
+                ForeColor = dialog.ForeColor,
+                UseMnemonic = false
             };
             dialog.Controls.AddRange(new Control[] { label, countInput, ok });
             dialog.AcceptButton = ok;
@@ -294,12 +441,17 @@ sealed partial class BrowserWindow
             }
         };
         priorityFlow.Controls.Add(modernCustomPriorityPill);
+        ecoCard1.Controls.Add(priorityFlow);
 
         modernPinCheck = CreateModernCheckBox("Manter esta aba atual ativa", Current?.KeepAwake == true);
         modernPinCheck.CheckedChanged += (_, _) =>
         {
             if (Current is { } tab) tab.KeepAwake = modernPinCheck.Checked;
         };
+        ecoCard1.Controls.Add(modernPinCheck);
+
+        // Card 2: Memória & Recursos
+        var ecoCard2 = CreateMenuCard("MEMÓRIA & RECURSOS DO SISTEMA", cardWidth, contentWidth);
 
         modernMediaCheck = CreateModernCheckBox("Pausar mídia ao sair da aba", pauseBackgroundMedia);
         modernMediaCheck.CheckedChanged += async (_, _) =>
@@ -308,6 +460,7 @@ sealed partial class BrowserWindow
             foreach (var tab in items.Values.ToArray())
                 if (tab.Ready && tab.MediaInstalled && tab.View is { } web) await InstallMediaGuard(tab, web);
         };
+        ecoCard2.Controls.Add(modernMediaCheck);
 
         modernDeepCheck = CreateModernCheckBox("Economia forte (descartar páginas após prazo)", deepEconomy);
         modernDeepCheck.CheckedChanged += (_, _) =>
@@ -325,6 +478,7 @@ sealed partial class BrowserWindow
             deepEconomy = modernDeepCheck.Checked;
             UpdateChrome();
         };
+        ecoCard2.Controls.Add(modernDeepCheck);
 
         modernAutoMemCheck = CreateModernCheckBox("Liberar memória acima de 1,2 GB", automaticMemory);
         modernAutoMemCheck.CheckedChanged += (_, _) =>
@@ -332,75 +486,51 @@ sealed partial class BrowserWindow
             automaticMemory = modernAutoMemCheck.Checked;
             memoryPressure = false;
         };
+        ecoCard2.Controls.Add(modernAutoMemCheck);
 
-        var econActionsFlow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0, 6, 0, 4) };
-        var btnSuspend = new ModernActionBtn("💤 Suspender inativas") { Width = 140 };
+        var actionsPanel = new TableLayoutPanel
+        {
+            Width = contentWidth,
+            Height = 36,
+            RowCount = 1,
+            ColumnCount = 2,
+            Margin = new Padding(0, 6, 0, 4)
+        };
+        actionsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+        actionsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+
+        var btnSuspend = new ModernActionBtn("💤 Suspender inativas") { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 3, 0) };
         btnSuspend.Click += async (_, _) =>
         {
             modernToolsPopup?.Hide();
             await SuspendTabs(true);
         };
-        var btnUnload = new ModernActionBtn("🧹 Liberar 2º plano") { Width = 140 };
+        var btnUnload = new ModernActionBtn("🧹 Liberar 2º plano") { Dock = DockStyle.Fill, Margin = new Padding(3, 0, 0, 0) };
         btnUnload.Click += (_, _) =>
         {
             modernToolsPopup?.Hide();
             UnloadBackgroundTabs();
         };
-        var btnDiag = new ModernActionBtn("📊 Diagnóstico") { Width = (int)(panelWidth - 40) };
+        actionsPanel.Controls.Add(btnSuspend, 0, 0);
+        actionsPanel.Controls.Add(btnUnload, 1, 0);
+        ecoCard2.Controls.Add(actionsPanel);
+
+        var btnDiag = new ModernActionBtn("📊 Diagnóstico de abas e consumo") { Width = contentWidth };
         btnDiag.Click += (_, _) =>
         {
             modernToolsPopup?.Hide();
             ShowTabDiagnostics();
         };
-        econActionsFlow.Controls.Add(btnSuspend);
-        econActionsFlow.Controls.Add(btnUnload);
-        econActionsFlow.Controls.Add(btnDiag);
+        ecoCard2.Controls.Add(btnDiag);
 
-        // Add controls in reverse order for DockStyle.Top
-        econSection.Controls.Add(econActionsFlow);
-        econSection.Controls.Add(modernAutoMemCheck);
-        econSection.Controls.Add(modernDeepCheck);
-        econSection.Controls.Add(modernMediaCheck);
-        econSection.Controls.Add(modernPinCheck);
-        econSection.Controls.Add(priorityFlow);
-        econSection.Controls.Add(priorityLabel);
-        econSection.Controls.Add(timeFlow);
-        econSection.Controls.Add(timeLabel);
-        econSection.Controls.Add(modernEconomyCheck);
+        pageEco.Controls.Add(ecoCard1);
+        pageEco.Controls.Add(ecoCard2);
 
-        // --- SEÇÃO 2: NAVEGAÇÃO & PRIVACIDADE ---
-        var navSection = CreateSectionPanel("🔒 NAVEGAÇÃO & PRIVACIDADE");
-        var btnPass = new ModernActionBtn("🔑 Senhas — importar e gerenciar…") { Dock = DockStyle.Top, Height = 32 };
-        btnPass.Click += (_, _) =>
-        {
-            modernToolsPopup?.Hide();
-            ShowPasswords();
-        };
+        // ================= PAGE 2: VISUAL =================
+        var pageVisual = CreateTabPage();
+        var visCard1 = CreateMenuCard("TEMA & INTERFACE", cardWidth, contentWidth);
 
-        modernBlockersCheck = CreateModernCheckBox("Bloquear rastreadores conhecidos", blockTrackers);
-        modernBlockersCheck.CheckedChanged += (_, _) =>
-        {
-            blockTrackers = modernBlockersCheck.Checked;
-            UpdateChrome();
-        };
-
-        var btnClearHist = new ModernActionBtn("🗑 Limpar histórico de endereços") { Dock = DockStyle.Top, Height = 32 };
-        btnClearHist.Click += (_, _) =>
-        {
-            browsing.History.Clear();
-            SaveBrowsingPreferences();
-            RefreshAddressSuggestions();
-            status.Text = "Histórico de endereços limpo com sucesso.";
-            modernToolsPopup?.Hide();
-        };
-
-        navSection.Controls.Add(btnClearHist);
-        navSection.Controls.Add(modernBlockersCheck);
-        navSection.Controls.Add(btnPass);
-
-        // --- SEÇÃO 3: APARÊNCIA & SISTEMA ---
-        var sysSection = CreateSectionPanel("🎨 APARÊNCIA & SISTEMA");
-        modernDarkCheck = CreateModernCheckBox("Modo escuro", darkMode);
+        modernDarkCheck = CreateModernCheckBox("Modo escuro (on/off)", darkMode);
         modernDarkCheck.CheckedChanged += (_, _) =>
         {
             if (darkMode != modernDarkCheck.Checked)
@@ -424,30 +554,130 @@ sealed partial class BrowserWindow
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
             }
         };
+        visCard1.Controls.Add(modernDarkCheck);
 
-        var btnAbout = new ModernActionBtn("ℹ Informações de memória e otimizações") { Dock = DockStyle.Top, Height = 32 };
-        btnAbout.Click += (_, _) =>
+        modernBookmarksCheck = CreateModernCheckBox("Mostrar barra de favoritos (Ctrl+Shift+B)", browsing.ShowBookmarksBar);
+        modernBookmarksCheck.CheckedChanged += (_, _) =>
+        {
+            if (bookmarkBar.Visible != modernBookmarksCheck.Checked)
+                ToggleBookmarksBar(modernBookmarksCheck.Checked);
+        };
+        visCard1.Controls.Add(modernBookmarksCheck);
+
+        var visCard2 = CreateMenuCard("INICIALIZAÇÃO & SESSÃO", cardWidth, contentWidth);
+
+        modernRestoreTabsCheck = CreateModernCheckBox("Restaurar abas abertas ao iniciar", browsing.RestoreTabsOnStartup);
+        modernRestoreTabsCheck.CheckedChanged += (_, _) =>
+        {
+            browsing.RestoreTabsOnStartup = modernRestoreTabsCheck.Checked;
+            SaveBrowsingPreferences();
+            status.Text = browsing.RestoreTabsOnStartup
+                ? "As abas abertas serão salvas e restauradas ao reiniciar."
+                : "O VOLT iniciará com uma nova guia.";
+        };
+        visCard2.Controls.Add(modernRestoreTabsCheck);
+
+        var restoreTip = new Label
+        {
+            Text = "Salva as abas abertas ao fechar e as reabre automaticamente ao reabrir o VOLT.",
+            Font = new Font("Segoe UI", 8.25f),
+            ForeColor = Color.Gray,
+            Width = contentWidth,
+            Height = 32,
+            UseMnemonic = false,
+            Margin = new Padding(20, 0, 0, 4)
+        };
+        visCard2.Controls.Add(restoreTip);
+
+        var visCard3 = CreateMenuCard("ATALHOS & PRODUTIVIDADE", cardWidth, contentWidth);
+        var shortcutsLabel = new Label
+        {
+            Text = "• Ctrl+T: Nova aba\n• Ctrl+Shift+B: Alternar barra de favoritos\n• Alt+P: Ativar Picture-in-Picture no vídeo\n• Arrastar aba: Destacar em uma nova janela",
+            Font = new Font("Segoe UI", 8.5f),
+            Width = contentWidth,
+            Height = 72,
+            UseMnemonic = false,
+            Margin = new Padding(4, 2, 0, 2)
+        };
+        visCard3.Controls.Add(shortcutsLabel);
+
+        pageVisual.Controls.Add(visCard1);
+        pageVisual.Controls.Add(visCard2);
+        pageVisual.Controls.Add(visCard3);
+
+        // ================= PAGE 3: SEGURANÇA =================
+        var pageSec = CreateTabPage();
+        var secCard1 = CreateMenuCard("PRIVACIDADE & RASTREAMENTO", cardWidth, contentWidth);
+
+        modernBlockersCheck = CreateModernCheckBox("Bloquear rastreadores conhecidos", blockTrackers);
+        modernBlockersCheck.CheckedChanged += (_, _) =>
+        {
+            blockTrackers = modernBlockersCheck.Checked;
+            UpdateChrome();
+        };
+        secCard1.Controls.Add(modernBlockersCheck);
+
+        var btnClearHist = new ModernActionBtn("🗑 Limpar histórico de endereços") { Width = contentWidth };
+        btnClearHist.Click += (_, _) =>
+        {
+            browsing.History.Clear();
+            SaveBrowsingPreferences();
+            RefreshAddressSuggestions();
+            status.Text = "Histórico de endereços limpo com sucesso.";
+            modernToolsPopup?.Hide();
+        };
+        secCard1.Controls.Add(btnClearHist);
+
+        var secCard2 = CreateMenuCard("CREDENCIAIS & SENHAS", cardWidth, contentWidth);
+        var btnPass = new ModernActionBtn("🔑 Senhas — importar e gerenciar…") { Width = contentWidth };
+        btnPass.Click += (_, _) =>
         {
             modernToolsPopup?.Hide();
-            MessageBox.Show(this,
-                "VOLT 0.6.7 • Otimização e Desempenho\n\n• Modo de economia: suspende abas inativas após o tempo configurado.\n• Prioridade de abas: protege as primeiras N abas (ex: 3 abas) para que fiquem sempre ativas.\n• Proteção inteligente: abas com áudio em reprodução, downloads ativos ou marcadas como fixas nunca são suspensas.\n• Economia forte: libera memória RAM descartando páginas elegíveis após o prazo.\n• Autocompletar: digite o início do site ou termo para preencher e navegar rapidamente.",
-                "VOLT — Desempenho");
+            ShowPasswords();
         };
+        secCard2.Controls.Add(btnPass);
 
-        sysSection.Controls.Add(btnAbout);
-        sysSection.Controls.Add(modernDarkCheck);
+        var secCard3 = CreateMenuCard("IMPORTAÇÃO DE DADOS", cardWidth, contentWidth);
+        var btnImport = new ModernActionBtn("📥 Importar de outros navegadores…") { Width = contentWidth };
+        btnImport.Click += (_, _) =>
+        {
+            modernToolsPopup?.Hide();
+            ShowBrowserImportDialog();
+        };
+        secCard3.Controls.Add(btnImport);
 
-        // --- SEÇÃO 4: ATUALIZAÇÕES DO NAVEGADOR ---
-        var updateSection = CreateSectionPanel("🔄 ATUALIZAÇÕES DO NAVEGADOR");
+        var importTip = new Label
+        {
+            Text = "Transfira favoritos do Chrome, Edge, Brave, Opera ou arquivo HTML.",
+            Font = new Font("Segoe UI", 8.25f),
+            ForeColor = Color.Gray,
+            Width = contentWidth,
+            Height = 20,
+            UseMnemonic = false,
+            Margin = new Padding(2, 0, 0, 2)
+        };
+        secCard3.Controls.Add(importTip);
+
+        pageSec.Controls.Add(secCard1);
+        pageSec.Controls.Add(secCard2);
+        pageSec.Controls.Add(secCard3);
+
+        // ================= PAGE 4: SISTEMA =================
+        var pageSys = CreateTabPage();
+        var sysCard1 = CreateMenuCard("ATUALIZAÇÕES DO VOLT", cardWidth, contentWidth);
+
         var updateStatusLbl = new Label
         {
             Text = $"Versão atual: v{UpdateManager.CurrentVersionString}",
             Font = new Font("Segoe UI", 8.5f),
-            Dock = DockStyle.Top,
-            Height = 22
+            Width = contentWidth,
+            Height = 22,
+            UseMnemonic = false,
+            Margin = new Padding(0, 0, 0, 4)
         };
+        sysCard1.Controls.Add(updateStatusLbl);
 
-        var btnUpdate = new ModernActionBtn("🔍 Verificar atualizações agora") { Dock = DockStyle.Top, Height = 32 };
+        var btnUpdate = new ModernActionBtn("🔍 Verificar atualizações agora") { Width = contentWidth };
         UpdateInfo? pendingUpdate = null;
 
         btnUpdate.Click += async (_, _) =>
@@ -515,23 +745,66 @@ sealed partial class BrowserWindow
                 btnUpdate.Enabled = true;
             }
         };
+        sysCard1.Controls.Add(btnUpdate);
 
-        updateSection.Controls.Add(btnUpdate);
-        updateSection.Controls.Add(updateStatusLbl);
+        var sysCard2 = CreateMenuCard("SOBRE O NAVEGADOR & DESEMPENHO", cardWidth, contentWidth);
+        var infoDesc = new Label
+        {
+            Text = "• Modo de economia inteligente: descarrega memória de abas ociosas sem perder o estado.\n• Zoom persistente: escala personalizada mantida por site.\n• PiP flutuante (Alt+P): assista vídeos enquanto navega em outras guias.\n• Proteção contra suspensão: abas com som ativo ou downloads não são congeladas.",
+            Font = new Font("Segoe UI", 8.25f),
+            Width = contentWidth,
+            Height = 84,
+            UseMnemonic = false,
+            Margin = new Padding(2, 2, 0, 4)
+        };
+        sysCard2.Controls.Add(infoDesc);
 
-        // Add sections in reverse order so header is at top
-        container.Controls.Add(updateSection);
-        container.Controls.Add(sysSection);
-        container.Controls.Add(navSection);
-        container.Controls.Add(econSection);
-        container.Controls.Add(headerPanel);
+        pageSys.Controls.Add(sysCard1);
+        pageSys.Controls.Add(sysCard2);
 
-        var host = new ToolStripControlHost(container)
+        // Register Pages
+        modernTabPages.Clear();
+        modernTabPages.Add(pageEco);
+        modernTabPages.Add(pageVisual);
+        modernTabPages.Add(pageSec);
+        modernTabPages.Add(pageSys);
+
+        foreach (var page in modernTabPages)
+        {
+            pagesContainer.Controls.Add(page);
+        }
+
+        void SelectTab(int index)
+        {
+            for (int i = 0; i < modernTabButtons.Count; i++)
+            {
+                modernTabButtons[i].IsSelected = i == index;
+                modernTabButtons[i].Invalidate();
+            }
+            for (int i = 0; i < modernTabPages.Count; i++)
+            {
+                modernTabPages[i].Visible = i == index;
+            }
+        }
+
+        tabEco.Click += (_, _) => SelectTab(0);
+        tabVisual.Click += (_, _) => SelectTab(1);
+        tabSec.Click += (_, _) => SelectTab(2);
+        tabSys.Click += (_, _) => SelectTab(3);
+
+        SelectTab(0);
+
+        // Put together root container: pagesContainer (fill), tabsPanel (top), headerPanel (top)
+        rootContainer.Controls.Add(pagesContainer);
+        rootContainer.Controls.Add(tabsPanel);
+        rootContainer.Controls.Add(headerPanel);
+
+        var host = new ToolStripControlHost(rootContainer)
         {
             Margin = Padding.Empty,
             Padding = Padding.Empty,
             AutoSize = false,
-            Size = container.Size
+            Size = rootContainer.Size
         };
         modernToolsPopup.Items.Add(host);
 
@@ -539,24 +812,38 @@ sealed partial class BrowserWindow
         ApplyModernMenuTheme(darkMode);
     }
 
-    static Panel CreateSectionPanel(string headerText)
+    static FlowLayoutPanel CreateTabPage()
     {
-        var panel = new Panel
+        return new FlowLayoutPanel
         {
-            Dock = DockStyle.Top,
-            AutoSize = true,
-            Padding = new Padding(8, 8, 8, 8),
-            Margin = new Padding(0, 0, 0, 10)
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoScroll = true,
+            Padding = new Padding(2, 4, 2, 8),
+            Margin = Padding.Empty
         };
-        var lbl = new Label
+    }
+
+    static ModernCardPanel CreateMenuCard(string headerText, int cardWidth, int contentWidth)
+    {
+        var card = new ModernCardPanel
+        {
+            Width = cardWidth
+        };
+
+        var titleLbl = new Label
         {
             Text = headerText,
-            Font = new Font("Segoe UI", 8f, FontStyle.Bold),
-            Dock = DockStyle.Top,
-            Height = 22
+            Font = new Font("Segoe UI", 8.25f, FontStyle.Bold),
+            Width = contentWidth,
+            Height = 20,
+            UseMnemonic = false,
+            Margin = new Padding(0, 0, 0, 4)
         };
-        panel.Controls.Add(lbl);
-        return panel;
+
+        card.Controls.Add(titleLbl);
+        return card;
     }
 
     static Label CreateSubtitleLabel(string text)
@@ -565,8 +852,8 @@ sealed partial class BrowserWindow
         {
             Text = text,
             Font = new Font("Segoe UI", 8.5f),
-            Dock = DockStyle.Top,
-            Height = 20,
+            AutoSize = true,
+            UseMnemonic = false,
             Margin = new Padding(0, 4, 0, 2)
         };
     }
@@ -577,10 +864,12 @@ sealed partial class BrowserWindow
         {
             Text = text,
             Checked = isChecked,
-            Dock = DockStyle.Top,
+            AutoSize = true,
             Height = 26,
             Font = new Font("Segoe UI", 9f),
-            Cursor = Cursors.Hand
+            Cursor = Cursors.Hand,
+            UseMnemonic = false,
+            Margin = new Padding(0, 2, 0, 4)
         };
     }
 
@@ -593,6 +882,8 @@ sealed partial class BrowserWindow
         if (modernAutoMemCheck != null) modernAutoMemCheck.Checked = automaticMemory;
         if (modernBlockersCheck != null) modernBlockersCheck.Checked = blockTrackers;
         if (modernDarkCheck != null) modernDarkCheck.Checked = darkMode;
+        if (modernBookmarksCheck != null) modernBookmarksCheck.Checked = browsing.ShowBookmarksBar;
+        if (modernRestoreTabsCheck != null) modernRestoreTabsCheck.Checked = browsing.RestoreTabsOnStartup;
 
         foreach (var (btn, mins) in modernTimePills)
         {
@@ -622,53 +913,59 @@ sealed partial class BrowserWindow
     {
         if (modernMenuPanel == null) return;
 
-        Color bg = isDark ? Color.FromArgb(28, 35, 46) : Color.FromArgb(248, 250, 252);
-        Color cardBg = isDark ? Color.FromArgb(36, 45, 59) : Color.White;
+        Color bg = isDark ? Color.FromArgb(24, 30, 40) : Color.FromArgb(246, 248, 251);
         Color textPrimary = isDark ? Color.FromArgb(240, 244, 250) : Color.FromArgb(30, 41, 59);
+        Color headerColor = isDark ? Color.FromArgb(14, 165, 233) : Color.FromArgb(2, 132, 199);
         Color textSec = isDark ? Color.FromArgb(150, 165, 185) : Color.FromArgb(100, 116, 139);
 
         modernMenuPanel.BackColor = bg;
         modernMenuPanel.ForeColor = textPrimary;
 
-        foreach (Control c in modernMenuPanel.Controls)
+        foreach (var tabBtn in modernTabButtons)
         {
-            if (c is Panel sec)
+            tabBtn.Dark = isDark;
+            tabBtn.Invalidate();
+        }
+
+        void ApplyToHierarchy(Control parent)
+        {
+            foreach (Control c in parent.Controls)
             {
-                sec.BackColor = cardBg;
-                foreach (Control sc in sec.Controls)
+                if (c is ModernCardPanel card)
                 {
-                    if (sc is Label l)
-                    {
-                        l.ForeColor = l.Font.Bold ? (isDark ? Color.FromArgb(14, 165, 233) : Color.FromArgb(2, 132, 199)) : textSec;
-                    }
-                    else if (sc is CheckBox cb)
-                    {
-                        cb.ForeColor = textPrimary;
-                    }
-                    else if (sc is FlowLayoutPanel flp)
-                    {
-                        foreach (Control pc in flp.Controls)
-                        {
-                            if (pc is ModernPillButton pb)
-                            {
-                                pb.Dark = isDark;
-                                pb.Invalidate();
-                            }
-                            else if (pc is ModernActionBtn ab)
-                            {
-                                ab.Dark = isDark;
-                                ab.Invalidate();
-                            }
-                        }
-                    }
-                    else if (sc is ModernActionBtn ab2)
-                    {
-                        ab2.Dark = isDark;
-                        ab2.Invalidate();
-                    }
+                    card.Dark = isDark;
+                    card.Invalidate();
+                }
+                else if (c is ModernPillButton pill)
+                {
+                    pill.Dark = isDark;
+                    pill.Invalidate();
+                }
+                else if (c is ModernActionBtn act)
+                {
+                    act.Dark = isDark;
+                    act.Invalidate();
+                }
+                else if (c is CheckBox cb)
+                {
+                    cb.ForeColor = textPrimary;
+                }
+                else if (c is Label lbl)
+                {
+                    if (lbl.Font.Bold)
+                        lbl.ForeColor = headerColor;
+                    else
+                        lbl.ForeColor = textSec;
+                }
+
+                if (c.HasChildren)
+                {
+                    ApplyToHierarchy(c);
                 }
             }
         }
+
+        ApplyToHierarchy(modernMenuPanel);
         modernMenuPanel.Invalidate(true);
     }
 

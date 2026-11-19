@@ -5,11 +5,23 @@ namespace Volt;
 
 sealed partial class BrowserWindow
 {
+    public sealed class SidebarItemModel
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string Title { get; set; } = "";
+        public string Url { get; set; } = "";
+    }
+
     sealed class BrowsingPreferences
     {
         public int SleepMinutes { get; set; } = 5;
         public int PriorityTabs { get; set; } = 0;
         public List<string> History { get; set; } = new();
+        public bool ShowBookmarksBar { get; set; } = true;
+        public Dictionary<string, double> SiteZoomLevels { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public bool RestoreTabsOnStartup { get; set; } = true;
+        public List<string> SavedSessionTabs { get; set; } = new();
+        public List<SidebarItemModel> SidebarItems { get; set; } = new();
     }
     BrowsingPreferences browsing = new();
     AddressSuggestions? addressSuggestions;
@@ -27,6 +39,39 @@ sealed partial class BrowserWindow
         if(!new[]{0,1,3,5,10,15,30,60}.Contains(browsing.SleepMinutes))browsing.SleepMinutes=5;
         browsing.PriorityTabs=Math.Clamp(browsing.PriorityTabs,0,100);
         browsing.History=(browsing.History ?? new()).Where(SafeSuggestion).Distinct(StringComparer.OrdinalIgnoreCase).Take(200).ToList();
+        browsing.SiteZoomLevels ??= new(StringComparer.OrdinalIgnoreCase);
+        browsing.SavedSessionTabs ??= new();
+        browsing.SidebarItems ??= new();
+    }
+
+    static string? GetSiteKey(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || !ResourcePolicy.IsHttp(url)) return null;
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Host.ToLowerInvariant() : null;
+    }
+
+    double GetSavedZoom(string? url)
+    {
+        if (GetSiteKey(url) is { } host && browsing.SiteZoomLevels.TryGetValue(host, out double zoom))
+        {
+            if (zoom >= 0.25 && zoom <= 5.0) return zoom;
+        }
+        return 1.0;
+    }
+
+    void SaveSiteZoom(string? url, double zoom)
+    {
+        if (GetSiteKey(url) is not { } host) return;
+        if (Math.Abs(zoom - 1.0) < 0.01)
+        {
+            if (browsing.SiteZoomLevels.Remove(host))
+                SaveBrowsingPreferences();
+        }
+        else if (zoom >= 0.25 && zoom <= 5.0)
+        {
+            browsing.SiteZoomLevels[host] = Math.Round(zoom, 2);
+            SaveBrowsingPreferences();
+        }
     }
 
     void SaveBrowsingPreferences()
